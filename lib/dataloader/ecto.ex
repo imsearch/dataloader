@@ -676,8 +676,19 @@ if Code.ensure_loaded?(Ecto) do
             records
             |> preload_lateral(field, query, source.repo, repo_opts)
           else
-            records
-            |> source.repo.preload([{field, query}], repo_opts)
+            batch_size = 1000
+            if Enum.count(records) > batch_size do
+              Enum.chunk_every(records, batch_size)
+              |> Enum.reduce([], fn batch_of_records, acc ->
+                preloaded_batch_results =
+                  batch_of_records
+                  |> source.repo.preload([{field, query}], repo_opts)
+                acc ++ preloaded_batch_results
+              end)
+            else
+              records
+              |> source.repo.preload([{field, query}], repo_opts)
+            end
           end
 
         results = results |> Enum.map(&Map.get(&1, field))
